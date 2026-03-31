@@ -18,7 +18,7 @@ class SPFCheckerService
     public function canISendAs(string $email): bool
     {
         if (empty($this->mailerHost)) {
-            return false; // ensure bool is always returned
+            return false;
         }
 
         $domain = $this->extractDomain($email);
@@ -28,18 +28,32 @@ class SPFCheckerService
             return false;
         }
 
-        // Normal SPF check
-        $spfRecord = dns_get_record($domain, DNS_TXT) ?: [];
+        // SAFE DNS CALL (avoid crash)
+        $spfRecord = @dns_get_record($domain, DNS_TXT);
+
+        if (!$spfRecord) {
+            return false;
+        }
+
+        // Normalize mail server (remove smtp.)
+        $cleanHost = str_replace('smtp.', '', strtolower($this->mailerHost));
 
         foreach ($spfRecord as $txt) {
-            if (isset($txt['txt']) && stripos($txt['txt'], $this->mailerHost) !== false) {
-                return true;
+            if (isset($txt['txt'])) {
+                $record = strtolower($txt['txt']);
+
+                // Match both full host and cleaned host
+                if (
+                    stripos($record, strtolower($this->mailerHost)) !== false ||
+                    stripos($record, $cleanHost) !== false
+                ) {
+                    return true;
+                }
             }
         }
 
-        return false; // default
+        return false;
     }
-
     /**
      * Give suggestions on how to send
      */
