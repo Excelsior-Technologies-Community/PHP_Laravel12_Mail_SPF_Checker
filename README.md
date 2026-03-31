@@ -2,7 +2,9 @@
 
 ## Introduction
 
-Mail SPF Checker is a Laravel 12 web application that allows users to check whether an email address can send emails via a specified mail server using SPF (Sender Policy Framework) records. It helps developers, admins, and users validate SPF configurations to ensure email deliverability and reduce spoofing risks.
+Mail SPF Checker is a Laravel 12 web application that allows users to check whether an email address can potentially send emails via a specified mail server using SPF (Sender Policy Framework) records.
+
+It performs basic SPF validation by analyzing DNS TXT records and helps developers and learners understand SPF configuration, email deliverability, and spoofing prevention.
 
 ---
 
@@ -12,7 +14,7 @@ This project provides:
 
 - A simple web form to enter an email address and mail server.
 
-- Automatic SPF record validation for the domain of the email.
+- Basic SPF record validation by checking DNS TXT records of the domain.
 
 - Special handling for Gmail addresses (since SPF cannot be modified for Gmail).
 
@@ -24,7 +26,7 @@ This project provides:
 
 - Optional copy-to-clipboard feature for suggested TXT records.
 
-It is designed for local development, testing, and learning purposes.
+It is designed for learning, local development, and demonstration purposes, and does not implement full SPF parsing (such as include/redirect mechanisms).
 
 ---
 
@@ -185,7 +187,7 @@ class SPFCheckerService
     public function canISendAs(string $email): bool
     {
         if (empty($this->mailerHost)) {
-            return false; // ensure bool is always returned
+            return false;
         }
 
         $domain = $this->extractDomain($email);
@@ -195,18 +197,32 @@ class SPFCheckerService
             return false;
         }
 
-        // Normal SPF check
-        $spfRecord = dns_get_record($domain, DNS_TXT) ?: [];
+        // SAFE DNS CALL (avoid crash)
+        $spfRecord = @dns_get_record($domain, DNS_TXT);
+
+        if (!$spfRecord) {
+            return false;
+        }
+
+        // Normalize mail server (remove smtp.)
+        $cleanHost = str_replace('smtp.', '', strtolower($this->mailerHost));
 
         foreach ($spfRecord as $txt) {
-            if (isset($txt['txt']) && stripos($txt['txt'], $this->mailerHost) !== false) {
-                return true;
+            if (isset($txt['txt'])) {
+                $record = strtolower($txt['txt']);
+
+                // Match both full host and cleaned host
+                if (
+                    stripos($record, strtolower($this->mailerHost)) !== false ||
+                    stripos($record, $cleanHost) !== false
+                ) {
+                    return true;
+                }
             }
         }
 
-        return false; // default
+        return false;
     }
-
     /**
      * Give suggestions on how to send
      */
