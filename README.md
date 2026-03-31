@@ -395,6 +395,17 @@ http://127.0.0.1:8000/mailspf
 
 ---
 
+## Best Working Example
+
+```
+Email: test@zoho.com  
+Server: zoho.com
+```
+
+- This works because the domain’s SPF record includes zoho.com.
+
+---
+
 ## Output
 
 <img src="screenshots/Screenshot 2026-03-30 172355.png" width="1000">
