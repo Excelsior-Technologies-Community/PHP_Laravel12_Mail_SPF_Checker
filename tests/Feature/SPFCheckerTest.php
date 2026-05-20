@@ -2,14 +2,19 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class SPFCheckerTest extends TestCase
 {
-    public function test_spf_page_loads()
+    use RefreshDatabase;
+
+    public function test_spf_page_loads(): void
     {
         $response = $this->get('/mailspf');
+
         $response->assertStatus(200);
-        $response->assertSee('Mail SPF Checker');
+
+        $response->assertSee('Advanced Mail SPF Checker');
     }
 }

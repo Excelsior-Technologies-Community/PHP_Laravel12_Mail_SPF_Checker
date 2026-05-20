@@ -4,45 +4,51 @@ namespace App\Services;
 
 class SPFCheckerService
 {
-    protected string $mailerHost = 'smtp.gmail.com'; // default
+    protected string $mailerHost = 'smtp.gmail.com';
 
     public function using(string $mailserver): self
     {
         $this->mailerHost = $mailserver ?: 'smtp.gmail.com';
+
         return $this;
     }
 
-    /**
-     * Check if email can be sent via the specified mail server
-     */
     public function canISendAs(string $email): bool
     {
         if (empty($this->mailerHost)) {
-            return false; // ensure bool is always returned
+            return false;
         }
 
         $domain = $this->extractDomain($email);
 
-        // Gmail/Google Workspace
         if ($this->isGoogleDomain($domain)) {
             return false;
         }
 
-        // Normal SPF check
-        $spfRecord = dns_get_record($domain, DNS_TXT) ?: [];
+        $spfRecord = @dns_get_record($domain, DNS_TXT);
+
+        if (!$spfRecord) {
+            return false;
+        }
+
+        $cleanHost = str_replace('smtp.', '', strtolower($this->mailerHost));
 
         foreach ($spfRecord as $txt) {
-            if (isset($txt['txt']) && stripos($txt['txt'], $this->mailerHost) !== false) {
-                return true;
+            if (isset($txt['txt'])) {
+                $record = strtolower($txt['txt']);
+
+                if (
+                    stripos($record, strtolower($this->mailerHost)) !== false ||
+                    stripos($record, $cleanHost) !== false
+                ) {
+                    return true;
+                }
             }
         }
 
-        return false; // default
+        return false;
     }
 
-    /**
-     * Give suggestions on how to send
-     */
     public function howCanISendAs(string $email): string
     {
         $domain = $this->extractDomain($email);
