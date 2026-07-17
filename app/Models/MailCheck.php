@@ -7,12 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class MailCheck extends Model
 {
     protected $fillable = [
-        'email',
-        'domain',
-        'mailserver',
-        'spf',
-        'dkim',
-        'dmarc',
-        'score'
+        'email', 'domain', 'mailserver',
+        'spf', 'dkim', 'dmarc',
+        'spf_grade', 'grade_label', 'score',
     ];
 }

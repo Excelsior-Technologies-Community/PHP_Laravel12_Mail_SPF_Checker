@@ -17,7 +17,8 @@ return new class extends Migration
             $table->boolean('spf')->default(false);
             $table->boolean('dkim')->default(false);
             $table->boolean('dmarc')->default(false);
-
+            $table->string('spf_grade')->default('None');
+            $table->string('grade_label')->default('Poor');
             $table->integer('score')->default(0);
 
             $table->timestamps();
