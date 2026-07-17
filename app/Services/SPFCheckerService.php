@@ -9,60 +9,80 @@ class SPFCheckerService
     public function using(string $mailserver): self
     {
         $this->mailerHost = $mailserver ?: 'smtp.gmail.com';
-
         return $this;
     }
 
     public function canISendAs(string $email): bool
     {
-        if (empty($this->mailerHost)) {
-            return false;
-        }
+        return in_array($this->getGrade($email), ['Pass']);
+    }
 
+    /**
+     * Returns: Pass | SoftFail | HardFail | Neutral | None
+     */
+    public function getGrade(string $email): string
+    {
         $domain = $this->extractDomain($email);
 
         if ($this->isGoogleDomain($domain)) {
-            return false;
+            return 'HardFail';
         }
 
-        $spfRecord = @dns_get_record($domain, DNS_TXT);
-
-        if (!$spfRecord) {
-            return false;
-        }
+        $records = @dns_get_record($domain, DNS_TXT);
+        if (!$records) return 'None';
 
         $cleanHost = str_replace('smtp.', '', strtolower($this->mailerHost));
+        $spfFound   = false;
 
-        foreach ($spfRecord as $txt) {
-            if (isset($txt['txt'])) {
-                $record = strtolower($txt['txt']);
+        foreach ($records as $txt) {
+            if (!isset($txt['txt'])) continue;
+            $record = strtolower($txt['txt']);
 
-                if (
-                    stripos($record, strtolower($this->mailerHost)) !== false ||
-                    stripos($record, $cleanHost) !== false
-                ) {
-                    return true;
-                }
+            if (!str_starts_with($record, 'v=spf1')) continue;
+            $spfFound = true;
+
+            // Pass
+            if (
+                stripos($record, strtolower($this->mailerHost)) !== false ||
+                stripos($record, $cleanHost) !== false
+            ) {
+                return 'Pass';
             }
+
+            // Qualifier at end
+            if (str_contains($record, '~all')) return 'SoftFail';
+            if (str_contains($record, '-all')) return 'HardFail';
+            if (str_contains($record, '?all')) return 'Neutral';
         }
 
-        return false;
+        return $spfFound ? 'Neutral' : 'None';
+    }
+
+    /**
+     * Deliverability score contribution from SPF (0-40)
+     */
+    public function scoreContribution(string $email): int
+    {
+        return match ($this->getGrade($email)) {
+            'Pass'     => 40,
+            'Neutral'  => 20,
+            'SoftFail' => 10,
+            default    => 0,
+        };
     }
 
     public function howCanISendAs(string $email): string
     {
         $domain = $this->extractDomain($email);
-
         if ($this->isGoogleDomain($domain)) {
-            return "You cannot modify SPF for Gmail addresses. Use Gmail SMTP with authentication.";
+            return 'You cannot modify SPF for Gmail addresses. Use Gmail SMTP with authentication.';
         }
-
         return "Generate a TXT record for {$domain} with value: v=spf1 include:{$this->mailerHost} -all";
     }
 
-    protected function extractDomain(string $email): string
+    public function extractDomain(string $email): string
     {
-        return substr(strrchr($email, "@"), 1);
+        return substr(strrchr($email, '@'), 1);
     }
 
     protected function isGoogleDomain(string $domain): bool
